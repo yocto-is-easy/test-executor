@@ -1,0 +1,81 @@
+#! /usr/bin/python3
+
+import argparse
+import subprocess
+import json
+
+REMOTE_TEST_EXECUTOR = "exec-local"
+
+def get_parser():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("test", help="Specifies the test to run. No default")
+    parser.add_argument("--user", help="Set the user of remote machine", default="root")
+    parser.add_argument("--ip", help="Set the IP", default="127.0.0.1")
+    parser.add_argument("--port", help="Set the Port", default="22")
+
+    return parser
+
+
+class TestCase:
+    def __init__(self, suit, case, status, result, timestamp) -> None:
+        self.test_suit = suit
+        self.test_case = case
+        self.status = status
+        self.result = result
+        self.timestamp = timestamp
+
+
+class TestResults:
+    def __init__(self) -> None:
+        self._test_cases = []
+
+
+    def from_json(json):
+        ret = TestResults()
+        testsuites = json["testsuites"]
+        for testsuite in testsuites:
+            testsuite_name = testsuite["name"]
+            for testcase in testsuite["testsuite"]:
+                tc = TestCase(testsuite_name, testcase["name"], testcase["status"], testcase["result"], testcase["timestamp"])
+                ret._test_cases.append(tc)
+
+        return ret
+
+
+class MoctoDevice:
+    def __init__(self, usr, ip, port) -> None:
+        self.usr = usr
+        self.ip = ip
+        self.port = port
+
+
+    def __get_cmd(self, test):
+        ssh_usr_ip = f"{self.usr}@{self.ip}"
+        ssh_port = f"-p {self.port}"
+        cmd = ['ssh', ssh_port, ssh_usr_ip, REMOTE_TEST_EXECUTOR, test, 'remote']
+        return cmd
+
+
+    def run_test(self, test) -> TestResults:
+        cmd = self.__get_cmd(test)
+        try:
+            execution_output= subprocess.check_output(cmd)
+            test_result = TestResults.from_json(json.loads(execution_output))
+            return test_result
+        except Exception as e:
+            return TestResults()
+
+
+def main():
+    parser = get_parser()
+    args = parser.parse_args()
+    m_device = MoctoDevice(args.user, args.ip, args.port)
+    test_result = m_device.run_test(args.test)
+
+    for tc in test_result._test_cases:
+        print(f"{tc.timestamp} - {tc.test_suit}.{tc.test_case} - {tc.result}")
+
+
+if __name__ == "__main__":
+    main()
