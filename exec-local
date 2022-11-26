@@ -1,0 +1,24 @@
+# executor of local tests
+
+if [ $# -eq 0 ]
+  then
+    echo "Error: No arguments"
+    exit -1
+fi
+
+TEST=$1
+TEST_PATH=$(which ${TEST})
+FORMAT=".json"
+REPORT_NAME="${TEST}_report${FORMAT}"
+REPORT_PATH="/home/root/${REPORT_NAME}"
+
+RUN_MODE=$2
+
+if [ "${RUN_MODE}" = "remote" ]
+then
+    env GTEST_OUTPUT="json:${REPORT_PATH}" ${TEST} > /dev/null
+    cat ${REPORT_PATH}
+    rm ${REPORT_PATH}
+else
+    ${TEST}
+fi
